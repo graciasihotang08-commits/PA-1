@@ -16,8 +16,6 @@ class ReviewController extends Controller
         return view('kritik', compact('reviews'));
     }
 
-
-
     // Fungsi untuk menyimpan kritik dari User
     public function store(Request $request)
     {
@@ -35,8 +33,6 @@ class ReviewController extends Controller
 
         return redirect()->back()->with('success', 'Berhasil mengirim kritik!');
     }
-
-
 
     // Fungsi untuk Menghapus Review (User)
     public function destroy($id)

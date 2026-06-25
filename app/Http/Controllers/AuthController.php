@@ -17,6 +17,34 @@ class AuthController extends Controller
         return view('login');
     }
 
+    // Menampilkan halaman register
+    public function showRegister()
+    {
+        return view('register');
+    }
+
+    // Proses register akun baru
+    public function register(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
+        ], [
+            'email.unique' => 'Email tersebut sudah terdaftar, silakan gunakan email lain',
+            'password.min' => 'Password minimal harus 6 karakter',
+        ]);
+
+        $user = new User();
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->password = Hash::make($request->password);
+        $user->role = 'user';
+        $user->save();
+
+        return redirect('/login')->with('success', 'Akun berhasil dibuat. Silakan login.');
+    }
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -33,7 +61,6 @@ class AuthController extends Controller
         }
 
         if (Auth::attempt($credentials)) {
-
             $request->session()->regenerate();
 
             // Redirect berdasarkan role
@@ -65,76 +92,56 @@ class AuthController extends Controller
 
         // Cari menu paling populer dari Orders dalam 7 hari terakhir
         $orders = Order::where('created_at', '>=', now()->subDays(7))->get();
-        
+
         // Jika tidak ada pesanan minggu ini, ambil dari semua pesanan sebagai fallback
         if ($orders->isEmpty()) {
             $orders = Order::all();
         }
+
         $menuCounts = [];
-        foreach($orders as $order) {
-            $items = explode(', ', $order->items);
-            foreach($items as $item) {
-                if(trim($item) == '') continue;
+
+        foreach ($orders as $order) {
+            $items = explode(', ', $order->menu);
+
+            foreach ($items as $item) {
+                if (trim($item) == '') {
+                    continue;
+                }
+
                 $parts = explode(' x', $item);
-                if(count($parts) == 2) {
+
+                if (count($parts) == 2) {
                     $name = trim($parts[0]);
-                    $qty = (int)$parts[1];
-                    if(!isset($menuCounts[$name])) {
+                    $qty = (int) $parts[1];
+
+                    if (!isset($menuCounts[$name])) {
                         $menuCounts[$name] = 0;
                     }
+
                     $menuCounts[$name] += $qty;
                 }
             }
         }
-        
+
         $popularMenu = null;
-        if(!empty($menuCounts)) {
+
+        if (!empty($menuCounts)) {
             arsort($menuCounts);
             $popularName = array_key_first($menuCounts);
             $popularMenu = Menu::where('name', $popularName)->first();
         }
 
         // Kalau tidak ada order atau menu tidak ditemukan, tampilkan menu pertama
-        if(!$popularMenu) {
+        if (!$popularMenu) {
             $popularMenu = Menu::first();
         }
 
         // Calculate average rating from Review model
         $averageRating = \App\Models\Review::avg('rating') ?? 0;
+
         // Round to 1 decimal place, e.g., 4.5
         $averageRating = round($averageRating, 1);
 
         return view('welcome', compact('latestGallery', 'popularMenu', 'averageRating'));
     }
-
-    public function showRegister()
-{
-    return view('register');
-}
-
-public function register(Request $request)
-{
-    $credentials = $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|email|unique:users,email',
-        'password' => 'required|min:8|confirmed',
-    ], [
-        'email.unique' => 'Email tersebut sudah terdaftar, silakan gunakan email lain',
-        'password.min' => 'Password minimal harus 8 karakter',
-        'password.confirmed' => 'Konfirmasi password tidak cocok',
-    ]);
-
-    $user = User::create([
-        'name' => $credentials['name'],
-        'email' => $credentials['email'],
-        'password' => Hash::make($credentials['password']),
-        'role' => 'customer', // default role, biar gak bisa daftar jadi admin sendiri
-    ]);
-
-    Auth::login($user);
-
-    $request->session()->regenerate();
-
-    return redirect('/welcome');
-}
 }
